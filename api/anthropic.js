@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -38,3 +39,6 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: err.message });
   }
 }
+=======
+
+>>>>>>> 32319d64bf9232ce6a439efa7cdc36e4986b854e
