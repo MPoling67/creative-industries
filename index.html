@@ -643,14 +643,11 @@ function renderTable(d, zone) {
   const stateColors = ['#be3650', '#1D9E75', '#d4b800'];
 
   const natCol = `<div class="tbl-col">
-    <div class="tbl-head">National avg</div>
-    <div class="tbl-cell tbl-cell--invest">
-      <span class="tbl-val">$879M</span><span class="tbl-sub">total appropriation</span>
-      <span class="tbl-sub" style="color:var(--muted)">$561M excl. line items</span>
-      <span class="tbl-sub">$2.02/capita · FY2025</span>
-    </div>
+    <div class="tbl-head">National Avg</div>
+    <div class="tbl-cell"><span class="tbl-val">$879M</span><span class="tbl-sub">FY2025 total</span></div>
+    <div class="tbl-cell"><span class="tbl-val">$2.02</span><span class="tbl-sub">per capita · FY2025</span></div>
     <div class="tbl-cell"><span class="tbl-val">4.2%</span><span class="tbl-sub">of state GDP</span></div>
-    <div class="tbl-cell"><span class="tbl-val">5.4M</span><span class="tbl-sub">4.2% of workforce</span></div>
+    <div class="tbl-cell"><span class="tbl-val">5.4M jobs</span><span class="tbl-sub">4.2% of workforce</span></div>
     <div class="tbl-cell"><span class="tbl-val tbl-muted">—</span></div>
   </div>`;
 
@@ -669,15 +666,14 @@ function renderTable(d, zone) {
     const last = nameParts.pop();
     const first = nameParts.join(' ');
 
+    // Extract just the number from gdp_pct e.g. "4.2% of state GDP" → "4.2%"
+    const gdpNum = (s.gdp_pct || '—').replace(/ of state GDP.*/i, '').trim();
+
     return `<div class="tbl-col tbl-state">
-      <div class="tbl-head" style="color:${color}">${first ? first + ' ' : ''}<em>${last}</em></div>
-      <div class="tbl-cell tbl-cell--invest">
-        <span class="tbl-val tbl-accent" style="color:${color}">${totalStr}</span>
-        <span class="tbl-sub">total appropriation</span>
-        <span class="tbl-sub" style="color:var(--muted)">${baseStr} excl. line items</span>
-        <span class="tbl-sub">${pcStr}${rankStr ? ' · ' + rankStr : ''}</span>
-      </div>
-      <div class="tbl-cell"><span class="tbl-val tbl-accent" style="color:${color}">${s.gdp_pct || '—'}</span><span class="tbl-sub">of state GDP</span></div>
+      <div class="tbl-head" style="color:var(--text)">${first ? first + ' ' : ''}<em style="color:${color}">${last}</em></div>
+      <div class="tbl-cell"><span class="tbl-val tbl-accent" style="color:${color}">${totalStr}</span><span class="tbl-sub">FY2025 total</span></div>
+      <div class="tbl-cell"><span class="tbl-val tbl-accent" style="color:${color}">${pcStr}</span><span class="tbl-sub">${rankStr}</span></div>
+      <div class="tbl-cell"><span class="tbl-val tbl-accent" style="color:${color}">${gdpNum}</span><span class="tbl-sub">of state GDP</span></div>
       <div class="tbl-cell"><span class="tbl-val tbl-accent" style="color:${color}">${s.jobs || '—'}</span><span class="tbl-sub">${s.jobs_pct || ''}</span></div>
       <div class="tbl-cell"><span class="tbl-val tbl-accent" style="color:${color}">${s.roi || '—'}</span></div>
     </div>`;
@@ -688,10 +684,11 @@ function renderTable(d, zone) {
       <div class="tbl-wrap">
         <div class="tbl-labels">
           <div class="tbl-head-blank"></div>
-          <div class="tbl-label">Arts investment</div>
+          <div class="tbl-label">Arts Investment</div>
+          <div class="tbl-label">Per Capita Investment</div>
           <div class="tbl-label">% of GDP</div>
-          <div class="tbl-label">Creative jobs</div>
-          <div class="tbl-label">ROI per $1 invested</div>
+          <div class="tbl-label">Creative Jobs</div>
+          <div class="tbl-label">ROI Per $1 Invested</div>
         </div>
         <div class="tbl-cols">
           ${natCol}
@@ -760,7 +757,7 @@ function renderNASAATrend(states) {
     const arrowColor = latest >= natLatest ? 'var(--green)' : 'var(--amber)';
     return `<span style="display:flex;align-items:center;gap:5px;color:var(--text)">
       <span style="width:14px;height:2px;background:${stateColors[i]};display:inline-block;border-radius:2px"></span>
-      ${s} <span style="color:${arrowColor};font-size:11px">${arrow} $${latest.toFixed(2)}</span>
+      ${s}
     </span>`;
   }).join('');
 
@@ -768,17 +765,13 @@ function renderNASAATrend(states) {
     <div>
       <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:0.8rem;flex-wrap:wrap;gap:8px">
         <p style="font-size:13px;font-weight:500;color:var(--text)">arts investment per capita · FY2022–FY2025</p>
-        <p style="font-size:12px;color:var(--muted)">baseline excl. line items · $/capita</p>
+        <p style="font-size:12px;color:var(--muted)">$/capita · FY2022–FY2025</p>
       </div>
       <div style="position:relative;width:100%;height:210px">
         <canvas id="trendChart"></canvas>
       </div>
       <div style="display:flex;gap:20px;margin-top:10px;font-size:12px;flex-wrap:wrap;align-items:center">
         ${legendItems}
-        <span style="display:flex;align-items:center;gap:5px;color:var(--muted)">
-          <span style="width:14px;height:0;border-top:2px dashed rgba(136,133,128,0.5);display:inline-block"></span>
-          National avg $${national[national.length-1].toFixed(2)}
-        </span>
       </div>
       <div style="font-size:11px;color:var(--muted);margin-top:8px">
         NASAA State Arts Agency Revenues · Table 6 · Legislative Appropriation (incl. line items) per capita
