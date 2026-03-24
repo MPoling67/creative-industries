@@ -622,15 +622,18 @@ async function runScorecard() {
 
 function buildPrompt(states) {
   const stateList = states.join(', ');
-  const isSingle = states.length === 1;
-  return 'You are a creative economy analyst. Return data for ' + stateList + ' using BEA ACPSA 2023 and NASAA FY2025 data.\n\n'
-    + 'Known anchor data — use these exact figures where applicable:\n'
-    + '- New Mexico: creative_gdp="$5.6B", gdp_pct="4.0% of state GDP", jobs="~43K", jobs_pct="5.5% of workforce", investment="$2.12/capita", roi="$1,244 per $1"\n'
-    + '- California: creative_gdp="$288.9B", gdp_pct="7.5% of state GDP", jobs="821K", jobs_pct="4.3% of workforce", investment="$0.67/capita", roi="$107,000 per $1"\n'
-    + '- Washington: creative_gdp="$79B", gdp_pct="9.78% of state GDP", jobs="190K", jobs_pct="5.0% of workforce", investment="$1.20/capita", roi="$10,800 per $1"\n'
-    + '- Minnesota: creative_gdp="$14.8B", gdp_pct="3.1% of state GDP", jobs="94K", jobs_pct="3.2% of workforce", investment="$8.00/capita", roi="$329 per $1"\n'
-    + '- Arizona: creative_gdp="$15.8B", gdp_pct="4.4% of state GDP", jobs="~115K", jobs_pct="3.8% of workforce", investment="$0.27/capita", roi="$7,900 per $1"\n\n'
-    + 'For any other state, estimate conservatively from BEA ACPSA 2023 patterns. Do not inflate.\n\n'
+  // Build real NASAA investment anchors for requested states
+  const anchors = states.map(s => {
+    const d = NASAA_DATA.states[s];
+    if (!d) return null;
+    return `- ${s}: investment_fy2025="$${d[3].toFixed(2)}/capita" (NASAA FY2025, real data)`;
+  }).filter(Boolean).join('\n');
+
+  return 'You are a creative economy analyst. Return data for ' + stateList + ' using BEA ACPSA 2023 data.\n\n'
+    + 'REAL NASAA INVESTMENT DATA — use these exact figures, do not alter:\n'
+    + anchors + '\n\n'
+    + 'National avg arts investment: $2.02/capita (NASAA FY2025)\n\n'
+    + 'For creative GDP, jobs, and ROI: use BEA ACPSA 2023 data. Estimate conservatively for unknown states.\n\n'
     + 'Return ONLY valid JSON. No markdown. Use this structure exactly: {"states":[{"state":"name","creative_gdp":"$XB","gdp_pct":"X% of state GDP","jobs":"~XK","jobs_pct":"X% of workforce","investment":"$X/capita","roi":"$X per $1","note":"one sentence"}],"insight":"one or two sentences"}';
 }
 
@@ -653,7 +656,10 @@ function renderTable(d, zone) {
       <div class="tbl-head">${first ? first + ' ' : ''}<em>${last}</em></div>
       <div class="tbl-cell"><span class="tbl-val tbl-accent">${s.creative_gdp}</span><span class="tbl-sub">${s.gdp_pct}</span></div>
       <div class="tbl-cell"><span class="tbl-val tbl-accent">${s.jobs}</span><span class="tbl-sub">${s.jobs_pct}</span></div>
-      <div class="tbl-cell"><span class="tbl-val tbl-accent">${s.investment}</span></div>
+      <div class="tbl-cell"><span class="tbl-val tbl-accent">${(() => {
+        const d = NASAA_DATA.states[s.state];
+        return d ? '$' + d[3].toFixed(2) + '/capita' : s.investment;
+      })()}</span><span class="tbl-sub" style="font-size:11px;color:var(--muted)">NASAA FY2025 · verified</span></div>
       <div class="tbl-cell"><span class="tbl-val tbl-accent">${s.roi}</span></div>
     </div>`;
   }).join('');
@@ -680,81 +686,65 @@ function renderTable(d, zone) {
           ${d.states.map(s => `<div class="tbl-note-row"><span style="color:var(--accent);font-weight:500">${s.state}:</span> ${s.note}</div>`).join('')}
         </div>` : ''}
       ${d.insight ? `<div class="insight-box" style="margin-top:1rem"><div class="insight-label">What the data reveals</div><div class="insight-text">${d.insight}</div></div>` : ''}
-      <div class="source-row" style="margin-top:1rem">Sources: BEA ACPSA 2023 · NASAA FY2025 · NEA State Profiles</div>
+      <div class="source-row" style="margin-top:1rem">Sources: BEA ACPSA 2023 · NASAA State Arts Agency Revenues FY2023 &amp; FY2025 (Table 6) · NEA State Profiles · Investment data real, not estimated</div>
       ${primaryState ? `
-        <div style="margin-top:1.5rem;padding-top:1.2rem;border-top:1px solid var(--border)">
-          <button class="btn-ghost" id="trend-btn" onclick="loadTrend('${primaryState}')">
-            See ${primaryState}'s creative economy trend 2019–2023 →
-          </button>
-          <div style="font-size:12px;color:var(--muted);margin-top:6px">Estimated trend · directional, not precise · based on BEA ACPSA patterns</div>
-        </div>
-        <div id="trend-zone"></div>` : ''}
+        <div id="trend-zone" style="margin-top:1.5rem;padding-top:1.2rem;border-top:1px solid var(--border)"></div>` : ''}
     </div>`;
-}
 
-async function loadTrend(state) {
-  const btn = document.getElementById('trend-btn');
-  btn.disabled = true;
-  btn.textContent = 'Loading trend…';
-  const tzone = document.getElementById('trend-zone');
-  tzone.innerHTML = `<div style="padding:1.5rem 0;text-align:center">
-    <div class="loading-spinner" style="margin:0 auto 8px"></div>
-    <div style="font-size:12px;color:var(--muted)">Estimating trend data for ${state}…</div>
-  </div>`;
-
-  const prompt = `Estimate the creative economy trend for ${state} from 2019 to 2023 using BEA ACPSA data and state arts agency records.
-
-Key known anchors:
-- New Mexico 2023: creative GDP $5.6B, investment $2.12/capita
-- California 2023: creative GDP $288.9B, investment $0.67/capita
-- National trend: pandemic dip 2020, recovery 2021-22, stabilization 2023
-
-For ${state}, estimate year-by-year values for 2019, 2020, 2021, 2022, 2023.
-2020 should generally show a pandemic dip. 2021-2022 recovery. 2023 near current known value.
-
-Return ONLY valid JSON with these exact keys, no markdown:
-state (string), years (array of 5 ints), creative_gdp_b (array of 5 numbers in billions), investment_capita (array of 5 numbers in dollars), gdp_pct (array of 5 numbers as percentages), context (one sentence string).
-Example years array: [2019,2020,2021,2022,2023]
-Example creative_gdp_b for NM: [5.1,4.6,5.0,5.3,5.6]`;
-
-  try {
-    const response = await fetch('/api/anthropic', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 600,
-        messages: [{ role: 'user', content: prompt }]
-      })
-    });
-    const data = await response.json();
-    if (!data.content) { tzone.innerHTML = ''; btn.disabled = false; btn.textContent = `See ${state}'s trend →`; return; }
-    const text = data.content.filter(b => b.type === 'text').map(b => b.text).join('');
-    let t;
-    try {
-      const clean = text.replace(/```json|```/g, '').trim();
-      const m = clean.match(/\{[\s\S]*\}/);
-      t = m ? JSON.parse(m[0]) : null;
-    } catch(e) { t = null; }
-    if (!t) { tzone.innerHTML = `<div class="error-state" style="margin-top:1rem">Could not parse trend data.</div>`; }
-    else { renderTrend(t, tzone); }
-  } catch(err) {
-    tzone.innerHTML = `<div class="error-state" style="margin-top:1rem">${err.message}</div>`;
+  // Auto-render NASAA investment trend for primary state
+  if (primaryState) {
+    setTimeout(() => renderNASAATrend(primaryState), 80);
   }
-  btn.style.display = 'none';
 }
 
-function renderTrend(t, tzone) {
+function renderNASAATrend(state) {
+  const tzone = document.getElementById('trend-zone');
+  if (!tzone) return;
+
+  const stateData = NASAA_DATA.states[state];
+  const years = NASAA_DATA.years;
+  const national = NASAA_DATA.national;
+
+  if (!stateData) {
+    tzone.innerHTML = `<div style="font-size:12px;color:var(--muted)">Investment trend data not available for ${state}.</div>`;
+    return;
+  }
+
+  // Compute vs national benchmark labels
+  const badges = stateData.map((v, i) => {
+    const diff = ((v - national[i]) / national[i] * 100).toFixed(0);
+    const sign = diff >= 0 ? '+' : '';
+    return sign + diff + '% vs natl avg';
+  });
+
+  const latest = stateData[stateData.length - 1];
+  const natLatest = national[national.length - 1];
+  const vsNat = latest >= natLatest
+    ? `<span style="color:var(--green)">↑ $${latest.toFixed(2)}/capita — above national avg ($${natLatest.toFixed(2)})</span>`
+    : `<span style="color:var(--amber)">↓ $${latest.toFixed(2)}/capita — below national avg ($${natLatest.toFixed(2)})</span>`;
+
   tzone.innerHTML = `
-    <div style="margin-top:1.5rem">
-      <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:8px">
-        <p style="font-size:14px;font-weight:500;color:var(--text)">${t.state} · creative economy 2019–2023</p>
-        <p style="font-size:12px;color:var(--muted)">Estimated · directional only</p>
+    <div>
+      <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:0.8rem;flex-wrap:wrap;gap:8px">
+        <p style="font-size:13px;font-weight:500;color:var(--text)">${state} · state arts investment FY2022–FY2025</p>
+        <p style="font-size:12px;color:var(--text)">${vsNat}</p>
       </div>
-      <div style="position:relative;width:100%;height:220px">
+      <div style="position:relative;width:100%;height:200px">
         <canvas id="trendChart"></canvas>
       </div>
-      ${t.context ? `<div class="tbl-note-row" style="margin-top:10px"><span style="color:var(--accent);font-weight:500">Context:</span> ${t.context}</div>` : ''}
+      <div style="display:flex;gap:20px;margin-top:8px;font-size:12px;flex-wrap:wrap">
+        <span style="display:flex;align-items:center;gap:5px;color:var(--text)">
+          <span style="width:14px;height:2px;background:var(--accent);display:inline-block;border-radius:2px"></span>
+          ${state}
+        </span>
+        <span style="display:flex;align-items:center;gap:5px;color:var(--muted)">
+          <span style="width:14px;height:2px;background:var(--muted);display:inline-block;border-radius:2px;opacity:0.6"></span>
+          National avg
+        </span>
+      </div>
+      <div style="font-size:12px;color:var(--muted);margin-top:8px">
+        Source: NASAA State Arts Agency Revenues Reports · Table 6 · Legislative Appropriation (incl. line items) per capita
+      </div>
     </div>`;
 
   setTimeout(() => {
@@ -762,30 +752,31 @@ function renderTrend(t, tzone) {
     new Chart(document.getElementById('trendChart'), {
       type: 'line',
       data: {
-        labels: t.years,
+        labels: years.map(y => 'FY' + y),
         datasets: [
           {
-            label: 'Creative GDP ($B)',
-            data: t.creative_gdp_b,
+            label: state + ' ($/capita)',
+            data: stateData,
             borderColor: '#be3650',
-            backgroundColor: 'transparent',
+            backgroundColor: 'rgba(190,54,80,0.08)',
+            fill: true,
             borderWidth: 2.5,
-            pointRadius: 4,
+            pointRadius: 5,
             pointBackgroundColor: '#be3650',
-            tension: 0.3,
-            yAxisID: 'y'
+            pointBorderColor: '#0e0e0e',
+            pointBorderWidth: 1.5,
+            tension: 0.3
           },
           {
-            label: 'Arts investment ($/capita)',
-            data: t.investment_capita,
-            borderColor: '#1D9E75',
+            label: 'National avg ($/capita)',
+            data: national,
+            borderColor: 'rgba(136,133,128,0.6)',
             backgroundColor: 'transparent',
-            borderWidth: 2,
+            borderWidth: 1.5,
             pointRadius: 3,
-            pointBackgroundColor: '#1D9E75',
-            borderDash: [4,3],
-            tension: 0.3,
-            yAxisID: 'y2'
+            pointBackgroundColor: 'rgba(136,133,128,0.6)',
+            borderDash: [5, 4],
+            tension: 0.3
           }
         ]
       },
@@ -794,35 +785,94 @@ function renderTrend(t, tzone) {
         maintainAspectRatio: false,
         plugins: {
           legend: { display: false },
-          tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + ctx.parsed.y } }
+          tooltip: {
+            callbacks: {
+              label: ctx => ctx.dataset.label + ': $' + ctx.parsed.y.toFixed(2)
+            }
+          }
         },
         scales: {
-          x: { grid: { color: 'rgba(255,255,255,0.06)' }, ticks: { color: '#888580', font: { size: 12 } } },
+          x: {
+            grid: { color: 'rgba(255,255,255,0.05)' },
+            ticks: { color: '#888580', font: { family: 'DM Mono', size: 12 } }
+          },
           y: {
             position: 'left',
-            grid: { color: 'rgba(255,255,255,0.06)' },
-            ticks: { color: '#be3650', font: { size: 11 }, callback: v => '$' + v + 'B' }
-          },
-          y2: {
-            position: 'right',
-            grid: { drawOnChartArea: false },
-            ticks: { color: '#1D9E75', font: { size: 11 }, callback: v => '$' + v }
+            grid: { color: 'rgba(255,255,255,0.05)' },
+            ticks: { color: '#f0ede8', font: { family: 'DM Mono', size: 11 }, callback: v => '$' + v.toFixed(2) },
+            title: { display: true, text: '$/capita', color: '#888580', font: { size: 11 } }
           }
         }
       }
     });
-
-    const legend = document.createElement('div');
-    legend.style.cssText = 'display:flex;gap:16px;margin-top:8px;font-size:12px;color:#888580';
-    legend.innerHTML = `
-      <span style="display:flex;align-items:center;gap:5px"><span style="width:12px;height:2px;background:#be3650;display:inline-block"></span>Creative GDP ($B)</span>
-      <span style="display:flex;align-items:center;gap:5px"><span style="width:12px;height:2px;background:#1D9E75;display:inline-block;border-top:2px dashed #1D9E75;height:0"></span>Arts investment ($/capita)</span>`;
-    tzone.querySelector('div').appendChild(legend);
-  }, 100);
+  }, 80);
 }
 
 
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+// ─── NASAA Real Data ───────────────────────────────────────────────────────
+// Source: NASAA State Arts Agency Revenues Reports, Table 6
+// Metric: Legislative Appropriation Including Line Items ($/capita)
+// FY2022 derived from Table 1/5 revenue totals · FY2023 & FY2025 direct from Table 6
+// FY2024 derived from Table 5 FY2024 revenue totals
+const NASAA_DATA = {
+  years: [2022, 2023, 2024, 2025],
+  national: [2.47, 2.88, 2.23, 2.02],
+  states: {
+    "Alabama":        [1.32, 1.50, 2.01, 1.58],
+    "Alaska":         [0.96, 1.05, 0.94, 1.24],
+    "Arizona":        [0.62, 0.68, 0.97, 0.26],
+    "Arkansas":       [0.44, 0.45, 0.46, 0.48],
+    "California":     [4.31, 3.48, 1.01, 0.82],
+    "Colorado":       [0.34, 0.35, 0.39, 0.55],
+    "Connecticut":    [9.44, 10.38, 2.27, 1.88],
+    "Delaware":       [3.81, 3.81, 4.78, 5.62],
+    "Florida":        [1.97, 3.76, 2.59, 1.31],
+    "Georgia":        [0.14, 0.14, 0.15, 0.14],
+    "Hawaii":         [5.40, 5.05, 11.14, 11.10],
+    "Idaho":          [0.47, 0.47, 0.54, 0.47],
+    "Illinois":       [5.05, 5.06, 5.17, 2.71],
+    "Indiana":        [0.53, 0.53, 0.77, 0.75],
+    "Iowa":           [0.46, 0.46, 0.68, 0.69],
+    "Kansas":         [0.17, 0.17, 0.35, 0.51],
+    "Kentucky":       [0.39, 0.40, 0.41, 0.40],
+    "Louisiana":      [0.47, 0.47, 0.46, 0.46],
+    "Maine":          [0.73, 0.74, 0.74, 0.74],
+    "Maryland":       [4.34, 4.51, 5.70, 5.47],
+    "Massachusetts":  [3.10, 3.35, 3.74, 3.76],
+    "Michigan":       [0.98, 1.18, 0.87, 1.10],
+    "Minnesota":      [7.37, 7.62, 9.68, 10.07],
+    "Mississippi":    [0.56, 2.01, 3.57, 3.38],
+    "Missouri":       [1.15, 3.01, 4.74, 8.72],
+    "Montana":        [0.51, 0.47, 1.02, 1.00],
+    "Nebraska":       [1.30, 5.13, 1.33, 1.31],
+    "Nevada":         [0.63, 0.66, 0.72, 0.75],
+    "New Hampshire":  [0.60, 0.60, 1.04, 1.01],
+    "New Jersey":     [6.63, 4.40, 4.93, 4.32],
+    "New Mexico":     [0.67, 0.75, 0.82, 0.79],
+    "New York":       [5.42, 12.27, 5.59, 4.39],
+    "North Carolina": [2.22, 0.85, 1.18, 1.12],
+    "North Dakota":   [1.08, 1.10, 1.72, 1.65],
+    "Ohio":           [1.71, 1.71, 2.19, 2.15],
+    "Oklahoma":       [0.75, 0.81, 1.06, 1.06],
+    "Oregon":         [0.96, 2.64, 1.43, 1.89],
+    "Pennsylvania":   [0.81, 0.81, 0.81, 0.82],
+    "Rhode Island":   [1.99, 2.01, 2.17, 2.15],
+    "South Carolina": [8.90, 2.64, 2.49, 2.24],
+    "South Dakota":   [1.23, 1.22, 1.47, 1.52],
+    "Tennessee":      [1.41, 1.56, 2.17, 2.22],
+    "Texas":          [0.34, 0.34, 0.47, 0.46],
+    "Utah":           [2.73, 2.79, 2.14, 3.09],
+    "Vermont":        [1.23, 1.33, 1.52, 1.50],
+    "Virginia":       [0.46, 0.53, 0.54, 0.52],
+    "Washington":     [0.42, 0.68, 0.86, 0.98],
+    "West Virginia":  [0.51, 0.54, 0.44, 0.46],
+    "Wisconsin":      [0.14, 0.14, 0.19, 0.18],
+    "Wyoming":        [1.60, 1.54, 1.68, 1.83]
+  }
+};
+</script>
 </body>
 </html>
