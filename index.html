@@ -622,58 +622,75 @@ async function runScorecard() {
 
 function buildPrompt(states) {
   const stateList = states.join(', ');
-  // Build real NASAA investment anchors for requested states
-  const anchors = states.map(s => {
-    const d = NASAA_DATA.states[s];
-    if (!d) return null;
-    return `- ${s}: investment_fy2025="$${d[3].toFixed(2)}/capita" (NASAA FY2025, real data)`;
-  }).filter(Boolean).join('\n');
-
   return 'You are a creative economy analyst. Return data for ' + stateList + ' using BEA ACPSA 2023 data.\n\n'
-    + 'REAL NASAA INVESTMENT DATA — use these exact figures, do not alter:\n'
-    + anchors + '\n\n'
-    + 'National avg arts investment: $2.02/capita (NASAA FY2025)\n\n'
-    + 'For creative GDP, jobs, and ROI: use BEA ACPSA 2023 data. Estimate conservatively for unknown states.\n\n'
-    + 'Return ONLY valid JSON. No markdown. Use this structure exactly: {"states":[{"state":"name","creative_gdp":"$XB","gdp_pct":"X% of state GDP","jobs":"~XK","jobs_pct":"X% of workforce","investment":"$X/capita","roi":"$X per $1","note":"one sentence"}],"insight":"one or two sentences"}';
+    + 'Investment data will be supplied from real NASAA data — do NOT return investment field, it is ignored.\n\n'
+    + 'For % of GDP, jobs, and ROI: use BEA ACPSA 2023 data. Estimate conservatively. Do not inflate.\n\n'
+    + 'Return ONLY valid JSON. No markdown. Use this structure exactly: {"states":[{"state":"name","gdp_pct":"X% of state GDP","jobs":"~XK","jobs_pct":"X% of workforce","roi":"$X per $1"}],"insight":""}';
 }
 
 
 
+function formatM(val) {
+  if (val >= 1000) return '$' + (val/1000).toFixed(1) + 'B';
+  return '$' + val.toFixed(1) + 'M';
+}
+
 function renderTable(d, zone) {
+  const allStates = d.states.map(s => s.state).filter(Boolean);
+  const primaryState = allStates[0] || null;
+
+  // State colors: crimson, green, amber
+  const stateColors = ['#be3650', '#1D9E75', '#d4b800'];
+
   const natCol = `<div class="tbl-col">
     <div class="tbl-head">National avg</div>
-    <div class="tbl-cell"><span class="tbl-val">$1.17T</span><span class="tbl-sub">4.2% of GDP</span></div>
+    <div class="tbl-cell tbl-cell--invest">
+      <span class="tbl-val">$879M</span><span class="tbl-sub">total appropriation</span>
+      <span class="tbl-sub" style="color:var(--muted)">$561M excl. line items</span>
+      <span class="tbl-sub">$2.02/capita · FY2025</span>
+    </div>
+    <div class="tbl-cell"><span class="tbl-val">4.2%</span><span class="tbl-sub">of state GDP</span></div>
     <div class="tbl-cell"><span class="tbl-val">5.4M</span><span class="tbl-sub">4.2% of workforce</span></div>
-    <div class="tbl-cell"><span class="tbl-val">$2.02</span><span class="tbl-sub">per capita</span></div>
     <div class="tbl-cell"><span class="tbl-val tbl-muted">—</span></div>
   </div>`;
 
-  const stateCols = d.states.map(s => {
+  const stateCols = d.states.map((s, i) => {
+    const color = stateColors[i] || '#be3650';
+    const nd = NASAA_DATA.states[s.state];
+    const nt = NASAA_TOTALS.states[s.state];
+    const nr = NASAA_RANKS.states[s.state];
+
+    const totalStr  = nt ? formatM(nt.total_fy2025)    : '—';
+    const baseStr   = nt ? formatM(nt.baseline_fy2025) : '—';
+    const pcStr     = nd ? '$' + nd[3].toFixed(2) + '/capita' : (s.investment || '—');
+    const rankStr   = nr ? 'ranked ' + nr + ' of 50'  : '';
+
     const nameParts = s.state.split(' ');
     const last = nameParts.pop();
     const first = nameParts.join(' ');
+
     return `<div class="tbl-col tbl-state">
-      <div class="tbl-head">${first ? first + ' ' : ''}<em>${last}</em></div>
-      <div class="tbl-cell"><span class="tbl-val tbl-accent">${s.creative_gdp}</span><span class="tbl-sub">${s.gdp_pct}</span></div>
-      <div class="tbl-cell"><span class="tbl-val tbl-accent">${s.jobs}</span><span class="tbl-sub">${s.jobs_pct}</span></div>
-      <div class="tbl-cell"><span class="tbl-val tbl-accent">${(() => {
-        const d = NASAA_DATA.states[s.state];
-        return d ? '$' + d[3].toFixed(2) + '/capita' : s.investment;
-      })()}</span><span class="tbl-sub" style="font-size:11px;color:var(--muted)">NASAA FY2025 · verified</span></div>
-      <div class="tbl-cell"><span class="tbl-val tbl-accent">${s.roi}</span></div>
+      <div class="tbl-head" style="color:${color}">${first ? first + ' ' : ''}<em>${last}</em></div>
+      <div class="tbl-cell tbl-cell--invest">
+        <span class="tbl-val tbl-accent" style="color:${color}">${totalStr}</span>
+        <span class="tbl-sub">total appropriation</span>
+        <span class="tbl-sub" style="color:var(--muted)">${baseStr} excl. line items</span>
+        <span class="tbl-sub">${pcStr}${rankStr ? ' · ' + rankStr : ''}</span>
+      </div>
+      <div class="tbl-cell"><span class="tbl-val tbl-accent" style="color:${color}">${s.gdp_pct || '—'}</span><span class="tbl-sub">of state GDP</span></div>
+      <div class="tbl-cell"><span class="tbl-val tbl-accent" style="color:${color}">${s.jobs || '—'}</span><span class="tbl-sub">${s.jobs_pct || ''}</span></div>
+      <div class="tbl-cell"><span class="tbl-val tbl-accent" style="color:${color}">${s.roi || '—'}</span></div>
     </div>`;
   }).join('');
 
-  const primaryState = d.states[0] ? d.states[0].state : null;
-
   zone.innerHTML = `
-    <div style="padding:1.5rem 0 2rem">
+    <div style="padding:1.5rem 0 2rem" id="scorecard-result">
       <div class="tbl-wrap">
         <div class="tbl-labels">
           <div class="tbl-head-blank"></div>
-          <div class="tbl-label">Creative GDP</div>
-          <div class="tbl-label">Creative jobs</div>
           <div class="tbl-label">Arts investment</div>
+          <div class="tbl-label">% of GDP</div>
+          <div class="tbl-label">Creative jobs</div>
           <div class="tbl-label">ROI per $1 invested</div>
         </div>
         <div class="tbl-cols">
@@ -681,100 +698,125 @@ function renderTable(d, zone) {
           ${stateCols}
         </div>
       </div>
-      ${d.states.length > 0 && d.states[0].note ? `
-        <div style="margin-top:1rem">
-          ${d.states.map(s => `<div class="tbl-note-row"><span style="color:var(--accent);font-weight:500">${s.state}:</span> ${s.note}</div>`).join('')}
-        </div>` : ''}
-      ${d.insight ? `<div class="insight-box" style="margin-top:1rem"><div class="insight-label">What the data reveals</div><div class="insight-text">${d.insight}</div></div>` : ''}
-      <div class="source-row" style="margin-top:1rem">Sources: BEA ACPSA 2023 · NASAA State Arts Agency Revenues FY2023 &amp; FY2025 (Table 6) · NEA State Profiles · Investment data real, not estimated</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-top:1.2rem">
+        <div class="source-row" style="margin:0">Sources: BEA ACPSA 2023 · NASAA FY2023 &amp; FY2025 Reports · Investment &amp; ranking data verified</div>
+        <button class="btn-ghost" id="screenshot-btn" onclick="takeScreenshot()" style="font-size:12px;padding:7px 14px">
+          ↓ save as image
+        </button>
+      </div>
       ${primaryState ? `
         <div id="trend-zone" style="margin-top:1.5rem;padding-top:1.2rem;border-top:1px solid var(--border)"></div>` : ''}
     </div>`;
 
-  // Auto-render NASAA investment trend for primary state
   if (primaryState) {
-    setTimeout(() => renderNASAATrend(primaryState), 80);
+    setTimeout(() => renderNASAATrend(allStates), 80);
   }
 }
 
-function renderNASAATrend(state) {
+function takeScreenshot() {
+  const btn = document.getElementById('screenshot-btn');
+  btn.textContent = 'capturing…';
+  btn.disabled = true;
+  const el = document.getElementById('scorecard-result');
+  if (!window.html2canvas) {
+    btn.textContent = '↓ save as image'; btn.disabled = false; return;
+  }
+  html2canvas(el, {
+    backgroundColor: '#0e0e0e',
+    scale: 2,
+    useCORS: true,
+    logging: false
+  }).then(canvas => {
+    const link = document.createElement('a');
+    link.download = 'creative-economies-scorecard.png';
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+    btn.textContent = '↓ save as image'; btn.disabled = false;
+  }).catch(() => { btn.textContent = '↓ save as image'; btn.disabled = false; });
+}
+
+function renderNASAATrend(states) {
   const tzone = document.getElementById('trend-zone');
   if (!tzone) return;
 
-  const stateData = NASAA_DATA.states[state];
-  const years = NASAA_DATA.years;
+  const stateColors  = ['#be3650', '#1D9E75', '#d4b800'];
+  const stateColorsBg= ['rgba(190,54,80,0.07)', 'rgba(29,158,117,0.07)', 'rgba(212,184,0,0.07)'];
+  const years   = NASAA_DATA.years;
   const national = NASAA_DATA.national;
 
-  if (!stateData) {
-    tzone.innerHTML = `<div style="font-size:12px;color:var(--muted)">Investment trend data not available for ${state}.</div>`;
+  // Filter to states with data
+  const validStates = states.filter(s => NASAA_DATA.states[s]);
+  if (!validStates.length) {
+    tzone.innerHTML = `<div style="font-size:12px;color:var(--muted)">No trend data available.</div>`;
     return;
   }
 
-  // Compute vs national benchmark labels
-  const badges = stateData.map((v, i) => {
-    const diff = ((v - national[i]) / national[i] * 100).toFixed(0);
-    const sign = diff >= 0 ? '+' : '';
-    return sign + diff + '% vs natl avg';
-  });
-
-  const latest = stateData[stateData.length - 1];
-  const natLatest = national[national.length - 1];
-  const vsNat = latest >= natLatest
-    ? `<span style="color:var(--green)">↑ $${latest.toFixed(2)}/capita — above national avg ($${natLatest.toFixed(2)})</span>`
-    : `<span style="color:var(--amber)">↓ $${latest.toFixed(2)}/capita — below national avg ($${natLatest.toFixed(2)})</span>`;
+  // Build legend items
+  const legendItems = validStates.map((s, i) => {
+    const d = NASAA_DATA.states[s];
+    const latest = d[d.length - 1];
+    const natLatest = national[national.length - 1];
+    const arrow = latest >= natLatest ? '↑' : '↓';
+    const arrowColor = latest >= natLatest ? 'var(--green)' : 'var(--amber)';
+    return `<span style="display:flex;align-items:center;gap:5px;color:var(--text)">
+      <span style="width:14px;height:2px;background:${stateColors[i]};display:inline-block;border-radius:2px"></span>
+      ${s} <span style="color:${arrowColor};font-size:11px">${arrow} $${latest.toFixed(2)}</span>
+    </span>`;
+  }).join('');
 
   tzone.innerHTML = `
     <div>
       <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:0.8rem;flex-wrap:wrap;gap:8px">
-        <p style="font-size:13px;font-weight:500;color:var(--text)">${state} · state arts investment FY2022–FY2025</p>
-        <p style="font-size:12px;color:var(--text)">${vsNat}</p>
+        <p style="font-size:13px;font-weight:500;color:var(--text)">arts investment per capita · FY2022–FY2025</p>
+        <p style="font-size:12px;color:var(--muted)">baseline excl. line items · $/capita</p>
       </div>
-      <div style="position:relative;width:100%;height:200px">
+      <div style="position:relative;width:100%;height:210px">
         <canvas id="trendChart"></canvas>
       </div>
-      <div style="display:flex;gap:20px;margin-top:8px;font-size:12px;flex-wrap:wrap">
-        <span style="display:flex;align-items:center;gap:5px;color:var(--text)">
-          <span style="width:14px;height:2px;background:var(--accent);display:inline-block;border-radius:2px"></span>
-          ${state}
-        </span>
+      <div style="display:flex;gap:20px;margin-top:10px;font-size:12px;flex-wrap:wrap;align-items:center">
+        ${legendItems}
         <span style="display:flex;align-items:center;gap:5px;color:var(--muted)">
-          <span style="width:14px;height:2px;background:var(--muted);display:inline-block;border-radius:2px;opacity:0.6"></span>
-          National avg
+          <span style="width:14px;height:0;border-top:2px dashed rgba(136,133,128,0.5);display:inline-block"></span>
+          National avg $${national[national.length-1].toFixed(2)}
         </span>
       </div>
-      <div style="font-size:12px;color:var(--muted);margin-top:8px">
-        Source: NASAA State Arts Agency Revenues Reports · Table 6 · Legislative Appropriation (incl. line items) per capita
+      <div style="font-size:11px;color:var(--muted);margin-top:8px">
+        NASAA State Arts Agency Revenues · Table 6 · Legislative Appropriation (incl. line items) per capita
       </div>
     </div>`;
 
   setTimeout(() => {
     if (!window.Chart) return;
+
+    const stateDatasets = validStates.map((s, i) => ({
+      label: s,
+      data: NASAA_DATA.states[s],
+      borderColor: stateColors[i],
+      backgroundColor: stateColorsBg[i],
+      fill: validStates.length === 1,
+      borderWidth: 2.5,
+      pointRadius: 5,
+      pointBackgroundColor: stateColors[i],
+      pointBorderColor: '#0e0e0e',
+      pointBorderWidth: 1.5,
+      tension: 0.3
+    }));
+
     new Chart(document.getElementById('trendChart'), {
       type: 'line',
       data: {
         labels: years.map(y => 'FY' + y),
         datasets: [
+          ...stateDatasets,
           {
-            label: state + ' ($/capita)',
-            data: stateData,
-            borderColor: '#be3650',
-            backgroundColor: 'rgba(190,54,80,0.08)',
-            fill: true,
-            borderWidth: 2.5,
-            pointRadius: 5,
-            pointBackgroundColor: '#be3650',
-            pointBorderColor: '#0e0e0e',
-            pointBorderWidth: 1.5,
-            tension: 0.3
-          },
-          {
-            label: 'National avg ($/capita)',
+            label: 'National avg',
             data: national,
-            borderColor: 'rgba(136,133,128,0.6)',
+            borderColor: 'rgba(136,133,128,0.5)',
             backgroundColor: 'transparent',
+            fill: false,
             borderWidth: 1.5,
             pointRadius: 3,
-            pointBackgroundColor: 'rgba(136,133,128,0.6)',
+            pointBackgroundColor: 'rgba(136,133,128,0.5)',
             borderDash: [5, 4],
             tension: 0.3
           }
@@ -787,7 +829,7 @@ function renderNASAATrend(state) {
           legend: { display: false },
           tooltip: {
             callbacks: {
-              label: ctx => ctx.dataset.label + ': $' + ctx.parsed.y.toFixed(2)
+              label: ctx => ctx.dataset.label + ': $' + ctx.parsed.y.toFixed(2) + '/capita'
             }
           }
         },
@@ -797,7 +839,6 @@ function renderNASAATrend(state) {
             ticks: { color: '#888580', font: { family: 'DM Mono', size: 12 } }
           },
           y: {
-            position: 'left',
             grid: { color: 'rgba(255,255,255,0.05)' },
             ticks: { color: '#f0ede8', font: { family: 'DM Mono', size: 11 }, callback: v => '$' + v.toFixed(2) },
             title: { display: true, text: '$/capita', color: '#888580', font: { size: 11 } }
@@ -811,6 +852,7 @@ function renderNASAATrend(state) {
 
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script>
 // ─── NASAA Real Data ───────────────────────────────────────────────────────
 // Source: NASAA State Arts Agency Revenues Reports, Table 6
@@ -871,6 +913,84 @@ const NASAA_DATA = {
     "West Virginia":  [0.51, 0.54, 0.44, 0.46],
     "Wisconsin":      [0.14, 0.14, 0.19, 0.18],
     "Wyoming":        [1.60, 1.54, 1.68, 1.83]
+  }
+};
+
+// ─── NASAA Totals FY2025 ────────────────────────────────────────────────────
+// Source: NASAA FY2025 Report, Table 1 (total incl. line items) & Table 2 (excl.)
+// Values in millions of dollars
+const NASAA_TOTALS = {
+  states: {
+    "Alabama":        { total_fy2025: 8.16,   baseline_fy2025: 6.83  },
+    "Alaska":         { total_fy2025: 0.92,   baseline_fy2025: 0.92  },
+    "Arizona":        { total_fy2025: 2.00,   baseline_fy2025: 2.00  },
+    "Arkansas":       { total_fy2025: 1.47,   baseline_fy2025: 1.47  },
+    "California":     { total_fy2025: 32.39,  baseline_fy2025: 32.39 },
+    "Colorado":       { total_fy2025: 3.27,   baseline_fy2025: 3.27  },
+    "Connecticut":    { total_fy2025: 6.91,   baseline_fy2025: 1.50  },
+    "Delaware":       { total_fy2025: 5.91,   baseline_fy2025: 5.91  },
+    "Florida":        { total_fy2025: 30.67,  baseline_fy2025: 0.74  },
+    "Georgia":        { total_fy2025: 1.59,   baseline_fy2025: 1.59  },
+    "Hawaii":         { total_fy2025: 16.05,  baseline_fy2025: 6.55  },
+    "Idaho":          { total_fy2025: 0.93,   baseline_fy2025: 0.93  },
+    "Illinois":       { total_fy2025: 34.40,  baseline_fy2025: 19.73 },
+    "Indiana":        { total_fy2025: 5.20,   baseline_fy2025: 5.20  },
+    "Iowa":           { total_fy2025: 2.22,   baseline_fy2025: 1.15  },
+    "Kansas":         { total_fy2025: 1.52,   baseline_fy2025: 1.52  },
+    "Kentucky":       { total_fy2025: 1.83,   baseline_fy2025: 1.83  },
+    "Louisiana":      { total_fy2025: 2.11,   baseline_fy2025: 2.11  },
+    "Maine":          { total_fy2025: 1.04,   baseline_fy2025: 1.04  },
+    "Maryland":       { total_fy2025: 34.25,  baseline_fy2025: 33.33 },
+    "Massachusetts":  { total_fy2025: 26.85,  baseline_fy2025: 25.90 },
+    "Michigan":       { total_fy2025: 11.13,  baseline_fy2025: 9.51  },
+    "Minnesota":      { total_fy2025: 58.32,  baseline_fy2025: 58.32 },
+    "Mississippi":    { total_fy2025: 9.94,   baseline_fy2025: 9.94  },
+    "Missouri":       { total_fy2025: 54.44,  baseline_fy2025: 10.95 },
+    "Montana":        { total_fy2025: 1.13,   baseline_fy2025: 1.13  },
+    "Nebraska":       { total_fy2025: 2.63,   baseline_fy2025: 2.63  },
+    "Nevada":         { total_fy2025: 2.44,   baseline_fy2025: 2.44  },
+    "New Hampshire":  { total_fy2025: 1.42,   baseline_fy2025: 1.42  },
+    "New Jersey":     { total_fy2025: 41.06,  baseline_fy2025: 32.36 },
+    "New Mexico":     { total_fy2025: 1.69,   baseline_fy2025: 1.69  },
+    "New York":       { total_fy2025: 87.28,  baseline_fy2025: 82.78 },
+    "North Carolina": { total_fy2025: 12.41,  baseline_fy2025: 12.29 },
+    "North Dakota":   { total_fy2025: 1.31,   baseline_fy2025: 1.31  },
+    "Ohio":           { total_fy2025: 25.56,  baseline_fy2025: 25.56 },
+    "Oklahoma":       { total_fy2025: 4.35,   baseline_fy2025: 3.95  },
+    "Oregon":         { total_fy2025: 8.06,   baseline_fy2025: 2.18  },
+    "Pennsylvania":   { total_fy2025: 10.66,  baseline_fy2025: 10.66 },
+    "Rhode Island":   { total_fy2025: 2.40,   baseline_fy2025: 2.00  },
+    "South Carolina": { total_fy2025: 12.25,  baseline_fy2025: 12.05 },
+    "South Dakota":   { total_fy2025: 1.41,   baseline_fy2025: 1.41  },
+    "Tennessee":      { total_fy2025: 16.02,  baseline_fy2025: 15.72 },
+    "Texas":          { total_fy2025: 14.32,  baseline_fy2025: 14.32 },
+    "Utah":           { total_fy2025: 10.84,  baseline_fy2025: 10.84 },
+    "Vermont":        { total_fy2025: 0.97,   baseline_fy2025: 0.97  },
+    "Virginia":       { total_fy2025: 4.59,   baseline_fy2025: 4.59  },
+    "Washington":     { total_fy2025: 7.80,   baseline_fy2025: 7.80  },
+    "West Virginia":  { total_fy2025: 0.81,   baseline_fy2025: 0.81  },
+    "Wisconsin":      { total_fy2025: 1.08,   baseline_fy2025: 1.08  },
+    "Wyoming":        { total_fy2025: 1.08,   baseline_fy2025: 1.08  }
+  }
+};
+
+// ─── NASAA Rankings FY2025 ──────────────────────────────────────────────────
+// Source: NASAA FY2025 Report, Table 6 · Legislative Approp Incl. Line Items · rank of 50
+const NASAA_RANKS = {
+  states: {
+    "Alabama": 20, "Alaska": 25, "Arizona": 48, "Arkansas": 42,
+    "California": 32, "Colorado": 39, "Connecticut": 17, "Delaware": 4,
+    "Florida": 23, "Georgia": 50, "Hawaii": 1, "Idaho": 43,
+    "Illinois": 11, "Indiana": 35, "Iowa": 38, "Kansas": 41,
+    "Kentucky": 47, "Louisiana": 44, "Maine": 37, "Maryland": 5,
+    "Massachusetts": 8, "Michigan": 27, "Minnesota": 2, "Mississippi": 9,
+    "Missouri": 3, "Montana": 30, "Nebraska": 24, "Nevada": 36,
+    "New Hampshire": 29, "New Jersey": 7, "New Mexico": 34, "New York": 6,
+    "North Carolina": 26, "North Dakota": 19, "Ohio": 15, "Oklahoma": 28,
+    "Oregon": 16, "Pennsylvania": 33, "Rhode Island": 14, "South Carolina": 12,
+    "South Dakota": 21, "Tennessee": 13, "Texas": 46, "Utah": 10,
+    "Vermont": 22, "Virginia": 40, "Washington": 31, "West Virginia": 45,
+    "Wisconsin": 49, "Wyoming": 18
   }
 };
 </script>
