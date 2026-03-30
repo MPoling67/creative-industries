@@ -267,36 +267,57 @@ select.state-pick.optional:not([value=""]):not([data-empty="true"]){
 .arch-model{background:rgba(59,109,17,0.15);color:#6aaa20}
 .archetype-desc{font-size:0.65rem;color:var(--muted);line-height:1.6}
 
-/* COMPARISON GRID — multi state */
+/* COMPARISON LAYOUT — metric cards + summary cards */
 .result-compare{animation:fadeUp 0.4s ease}
-.compare-header{padding:1.8rem 0 1rem;border-bottom:1px solid var(--border);margin-bottom:1.2rem}
+.compare-header{padding:1.8rem 0 1rem;border-bottom:1px solid var(--border);margin-bottom:1.5rem}
 .compare-header h3{
   font-family:var(--font-display);font-weight:300;font-size:1.4rem;letter-spacing:-0.02em;
 }
 .compare-header h3 em{font-style:italic;color:var(--accent)}
 .compare-header p{font-size:0.65rem;color:var(--muted);margin-top:4px}
 
-.compare-cards{display:grid;gap:10px;margin-bottom:1.2rem}
-.compare-card{
+/* Three stacked full-width metric cards */
+.metric-cards{display:flex;flex-direction:column;gap:10px;margin-bottom:1.5rem}
+.metric-card{
   background:var(--surface);border:1px solid var(--border);
+  border-radius:12px;padding:1.1rem 1.4rem 1.3rem;
+}
+.metric-card-label{
+  font-family:var(--font-body);font-size:10px;font-weight:500;
+  text-transform:uppercase;letter-spacing:0.13em;color:var(--muted);
+  margin-bottom:0.85rem;
+}
+.metric-row{display:flex;flex-direction:column;gap:10px}
+.metric-state-row{display:grid;align-items:center;gap:10px;}
+.metric-state-name{
+  font-family:var(--font-display);font-weight:700;font-size:15px;
+  color:#f0ede8;line-height:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.metric-bar-wrap{flex:1;height:8px;background:rgba(255,255,255,0.07);border-radius:99px;overflow:hidden}
+.metric-bar-fill{height:100%;border-radius:99px;transition:width 0.8s ease}
+.metric-val{
+  font-family:var(--font-display);font-weight:300;font-style:italic;font-size:14px;
+  color:#f0ede8;white-space:nowrap;text-align:right;
+}
+
+/* Summary cards below metric cards */
+.summary-cards{display:grid;gap:10px;margin-bottom:1.2rem}
+.summary-card{
+  background:var(--surface);border:1px solid var(--border);
+  border-top-width:3px;
   border-radius:12px;padding:1.1rem 1.3rem;
 }
-.cc-top{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px}
-.cc-name{
-  font-family:var(--font-display);font-weight:300;font-size:1.3rem;
-  letter-spacing:-0.02em;line-height:1;
+.sc-name{
+  font-family:var(--font-display);font-weight:700;font-size:24px;
+  color:#f0ede8;line-height:1.1;margin-bottom:6px;letter-spacing:-0.01em;
 }
-.cc-name em{font-style:italic;color:var(--accent)}
-.cc-score{
+.sc-score-row{display:flex;align-items:baseline;gap:6px;margin-bottom:0.6rem}
+.sc-score{
   font-family:var(--font-display);font-style:italic;font-weight:300;
-  font-size:2.2rem;line-height:1;
+  font-size:2rem;line-height:1;
 }
-.cc-dims{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:8px}
-.cc-dim{font-size:0.62rem;color:var(--muted)}
-.cc-dim-val{font-size:0.85rem;color:var(--text);font-weight:500;display:block;margin-bottom:2px}
-.cc-dim-bar{height:3px;background:rgba(255,255,255,0.06);border-radius:99px;overflow:hidden;margin-bottom:2px}
-.cc-dim-fill{height:100%;border-radius:99px;background:var(--accent)}
-.cc-narrative{font-size:0.65rem;color:var(--muted);line-height:1.7;border-top:1px solid var(--border);padding-top:8px}
+.sc-score-sub{font-size:0.58rem;color:var(--muted)}
+.sc-narrative{font-size:12px;font-weight:300;color:#f0ede8;line-height:1.75;}
 
 /* INSIGHT BOX — appears after compare */
 .insight-box{
@@ -358,6 +379,10 @@ select.state-pick.optional:not([value=""]):not([data-empty="true"]){
   .stat-box{border-right:none;border-bottom:1px solid var(--border)}
   .dim-grid{grid-template-columns:1fr}
   .cc-dims{grid-template-columns:1fr}
+  .metric-state-row{grid-template-columns:100px 1fr 72px !important}
+  .metric-state-name{font-size:12px}
+  .metric-val{font-size:12px}
+  .summary-cards{grid-template-columns:1fr !important}
 }
 </style>
 </head>
@@ -819,68 +844,71 @@ function renderSingle(d, zone) {
 }
 
 function renderCompare(d, zone) {
-  // Pre-compute real numeric values for bar scaling
-  // gdp_b max across compared states for relative bar width
+  // Assign a distinct color to each state — consistent across all three metric cards
+  const STATE_COLORS = ['#5b8dd9','#e07a30','#4caf8a','#c46ab0','#d4b800'];
   const stateNames = d.states.map(s => s.state);
-  const maxGdp  = Math.max(...stateNames.map(n => (BEA_DATA.states[n]||{}).gdp_b  || 0));
-  const maxJobs = Math.max(...stateNames.map(n => (BEA_DATA.states[n]||{}).jobs   || 0));
-  const maxInv  = Math.max(...stateNames.map(n => (NASAA_DATA.states[n]||[]).slice(-1)[0] || 0));
+  const colorMap = {};
+  stateNames.forEach((n, i) => { colorMap[n] = STATE_COLORS[i % STATE_COLORS.length]; });
 
+  // Pull real numeric data for all three metric cards
+  const stateData = stateNames.map(n => {
+    const bea = BEA_DATA.states[n] || {};
+    const nas = NASAA_DATA.states[n] || [];
+    const tot = (NASAA_TOTALS.states[n] || {});
+    const gdp_b    = bea.gdp_b  || 0;
+    const inv_percap = nas.slice(-1)[0] || 0;
+    // ROI: creative GDP ($B → $) / total arts approp ($M → $)
+    const roi_num  = (gdp_b && tot.total_fy2025)
+      ? Math.round((gdp_b * 1e9) / (tot.total_fy2025 * 1e6))
+      : null;
+    return { name: n, gdp_b, inv_percap, roi_num, color: colorMap[n] };
+  });
+
+  const maxGdp = Math.max(...stateData.map(s => s.gdp_b));
+  const maxInv = Math.max(...stateData.map(s => s.inv_percap));
+  const maxRoi = Math.max(...stateData.map(s => s.roi_num || 0));
+
+  // Column grid for metric bars: "140px 1fr 90px"  (name | bar | value)
+  const COL = '140px 1fr 90px';
+
+  function metricRows(key, max, fmt) {
+    return stateData.map(s => {
+      const raw = s[key] || 0;
+      const pct = max ? Math.round((raw / max) * 100) : 0;
+      return `<div class="metric-state-row" style="grid-template-columns:${COL}">
+        <div class="metric-state-name">${s.name}</div>
+        <div class="metric-bar-wrap"><div class="metric-bar-fill" style="width:${pct}%;background:${s.color}"></div></div>
+        <div class="metric-val">${fmt(raw, s)}</div>
+      </div>`;
+    }).join('');
+  }
+
+  const gdpRows = metricRows('gdp_b', maxGdp, v => `$${v}B`);
+  const invRows = metricRows('inv_percap', maxInv, v => `$${v}/cap`);
+  const roiRows = stateData.map(s => {
+    const raw = s.roi_num || 0;
+    const pct = maxRoi ? Math.round((raw / maxRoi) * 100) : 0;
+    return `<div class="metric-state-row" style="grid-template-columns:${COL}">
+      <div class="metric-state-name">${s.name}</div>
+      <div class="metric-bar-wrap"><div class="metric-bar-fill" style="width:${pct}%;background:${s.color}"></div></div>
+      <div class="metric-val">${raw ? '$' + raw.toLocaleString() : 'N/A'}</div>
+    </div>`;
+  }).join('');
+
+  // Summary cards — responsive grid, colored top border
   const cols = d.states.length <= 2 ? d.states.length : Math.min(d.states.length, 3);
-  const cards = d.states.map(s => {
-    const nameParts = s.state.split(' ');
-    const last = nameParts.pop();
-    const first = nameParts.join(' ');
-    const nameHtml = (first ? first + ' ' : '') + '<em>' + last + '</em>';
+  const summaryCards = d.states.map(s => {
     const sc = s.score_color || '#be3650';
-
-    // Pull real numeric fields for the three metric bars
-    const realBea  = BEA_DATA.states[s.state]  || {};
-    const realNas  = NASAA_DATA.states[s.state] || [];
-    const gdpReal   = realBea.gdp_b  || 0;
-    const jobsReal  = realBea.jobs   || 0;
-    const invReal   = realNas.slice(-1)[0] || 0;
-
-    const gdpPct  = maxGdp  ? Math.round((gdpReal  / maxGdp)  * 100) : 0;
-    const jobsPct = maxJobs ? Math.round((jobsReal / maxJobs) * 100) : 0;
-    const invPct  = maxInv  ? Math.round((invReal  / maxInv)  * 100) : 0;
-
-    // Bar color: semantic (amber/green/red) per design system note — NOT crimson-only
-    function barColor(pct) {
-      return pct >= 70 ? '#1D9E75' : pct >= 40 ? '#d4b800' : '#be3650';
-    }
-
+    const stateColor = colorMap[s.state];
     return `
-      <div class="compare-card">
-        <div class="cc-top">
-          <div class="cc-name">${nameHtml}</div>
-          <div class="cc-score" style="color:${sc}">${s.overall_score}</div>
+      <div class="summary-card" style="border-top-color:${stateColor}">
+        <div class="sc-name">${s.state}</div>
+        <div class="sc-score-row">
+          <div class="sc-score" style="color:${sc}">${s.overall_score}</div>
+          <div class="sc-score-sub">/ 100</div>
         </div>
-        <div class="cc-dims">
-          <div class="cc-dim">
-            <span class="cc-dim-val" style="color:${barColor(jobsPct)}">${jobsReal ? jobsReal.toLocaleString() : s.dims.employment.score}</span>
-            <div class="cc-dim-bar"><div class="cc-dim-fill" style="width:${jobsPct}%;background:${barColor(jobsPct)}"></div></div>
-            employment
-          </div>
-          <div class="cc-dim">
-            <span class="cc-dim-val" style="color:${barColor(gdpPct)}">$${gdpReal}B</span>
-            <div class="cc-dim-bar"><div class="cc-dim-fill" style="width:${gdpPct}%;background:${barColor(gdpPct)}"></div></div>
-            creative GDP
-          </div>
-          <div class="cc-dim">
-            <span class="cc-dim-val" style="color:${barColor(invPct)}">$${invReal}/cap</span>
-            <div class="cc-dim-bar"><div class="cc-dim-fill" style="width:${invPct}%;background:${barColor(invPct)}"></div></div>
-            investment
-          </div>
-        </div>
-        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:8px 0">
-          <div style="font-size:0.6rem;color:var(--muted)">GDP<br><span style="color:${sc};font-size:0.8rem">${s.creative_gdp}</span></div>
-          <div style="font-size:0.6rem;color:var(--muted)">investment<br><span style="color:${sc};font-size:0.8rem">${s.investment}</span></div>
-          <div style="font-size:0.6rem;color:var(--muted)">ROI per $1<br><span style="color:${sc};font-size:0.8rem">${s.roi}</span></div>
-        </div>
-        <div class="cc-narrative">${s.narrative}</div>
-      </div>
-    `;
+        <div class="sc-narrative">${s.narrative}</div>
+      </div>`;
   }).join('');
 
   zone.innerHTML = `
@@ -890,8 +918,23 @@ function renderCompare(d, zone) {
         <p>Scored against national benchmarks · BEA ACPSA 2023 · NASAA FY2025</p>
       </div>
 
-      <div class="compare-cards" style="grid-template-columns:repeat(${cols},1fr)">
-        ${cards}
+      <div class="metric-cards">
+        <div class="metric-card">
+          <div class="metric-card-label">Creative GDP Output</div>
+          <div class="metric-row">${gdpRows}</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-card-label">Per Capita Arts Investment (NASAA FY2025)</div>
+          <div class="metric-row">${invRows}</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-card-label">Return per $1 Invested</div>
+          <div class="metric-row">${roiRows}</div>
+        </div>
+      </div>
+
+      <div class="summary-cards" style="grid-template-columns:repeat(${cols},1fr)">
+        ${summaryCards}
       </div>
 
       ${d.insight ? `
