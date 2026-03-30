@@ -347,8 +347,6 @@ select.state-pick.optional:not([value=""]):not([data-empty="true"]){
 .page-footer{
   background:#111110;border-top:1px solid rgba(255,255,255,0.06);
   padding:1.5rem clamp(16px,4vw,2rem);
-  display:flex;justify-content:space-between;align-items:flex-start;
-  flex-wrap:wrap;gap:1.5rem;
 }
 .footer-left{font-family:var(--font-body);font-size:12px;font-weight:400;color:#f0ede8;line-height:1.8;flex:1;min-width:200px;}
 .footer-left a{color:#be3650;text-decoration:none;}
@@ -478,6 +476,7 @@ select.state-pick.optional:not([value=""]):not([data-empty="true"]){
 
 <!-- PAGE FOOTER -->
 <div class="page-footer">
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:1.5rem;width:100%;max-width:860px;margin:0 auto;">
   <div class="footer-left">
     © 2026 Creative Economy Scorecard | Monica Poling<br>
     <a href="https://monicapoling.com" target="_blank">Knowledge on Tap</a><br>
@@ -494,6 +493,7 @@ select.state-pick.optional:not([value=""]):not([data-empty="true"]){
       <button class="footer-email-btn" onclick="submitFooterEmail()">Subscribe Now</button>
     </div>
     <div class="footer-disclaimer">Get weekly tips on using AI to build mini apps. Unsubscribe any time.</div>
+  </div>
   </div>
 </div>
 
