@@ -32,8 +32,235 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,700;1,9..144,300&family=Plus+Jakarta+Sans:wght@300;400;500&display=swap" rel="stylesheet">
-<script src="/data/bea_data.js"></script>
-<script src="/data/nasaa_data.js"></script>
+<script>
+// ─── BEA ACPSA State Data ─────────────────────────────────────────────────────
+// Source: U.S. Bureau of Economic Analysis
+// Arts and Cultural Production Satellite Account (ACPSA), April 2025 release
+// Final published dataset — BEA discontinued regular ACPSA production Feb 2026
+// Tables: 2 (Value Added by State), 3 (% of GDP), 8 (Employment by State)
+// Jobs % calculated from BLS 2023 civilian employed by state
+//
+// Fields per state:
+//   gdp_b      — total arts & cultural value added, billions USD (2023)
+//   gdp_pct    — arts & cultural production as % of state GDP (2023)
+//   jobs       — total arts & cultural employment (2023)
+//   jobs_pct   — creative jobs as % of state civilian workforce (2023)
+
+const BEA_DATA = {
+  national: {
+    gdp_b: 1169.75,
+    gdp_pct: 4.2,
+    jobs: 5395370,
+    jobs_pct: 3.4
+  },
+  states: {
+    "Alabama": { gdp_b: 7.1, gdp_pct: 2.3, jobs: 61167, jobs_pct: 3.0 },
+    "Alaska": { gdp_b: 1.47, gdp_pct: 2.2, jobs: 13291, jobs_pct: 3.9 },
+    "Arizona": { gdp_b: 15.8, gdp_pct: 3.0, jobs: 95294, jobs_pct: 2.9 },
+    "Arkansas": { gdp_b: 3.85, gdp_pct: 2.2, jobs: 32906, jobs_pct: 2.5 },
+    "California": { gdp_b: 288.9, gdp_pct: 7.5, jobs: 821183, jobs_pct: 4.4 },
+    "Colorado": { gdp_b: 19.7, gdp_pct: 3.7, jobs: 121228, jobs_pct: 4.1 },
+    "Connecticut": { gdp_b: 13.94, gdp_pct: 4.0, jobs: 53421, jobs_pct: 3.1 },
+    "Delaware": { gdp_b: 1.13, gdp_pct: 1.2, jobs: 10156, jobs_pct: 2.2 },
+    "Florida": { gdp_b: 50.85, gdp_pct: 3.2, jobs: 307615, jobs_pct: 3.0 },
+    "Georgia": { gdp_b: 31.22, gdp_pct: 3.8, jobs: 164919, jobs_pct: 3.4 },
+    "Hawaii": { gdp_b: 3.25, gdp_pct: 2.9, jobs: 19608, jobs_pct: 3.0 },
+    "Idaho": { gdp_b: 2.77, gdp_pct: 2.3, jobs: 25272, jobs_pct: 3.0 },
+    "Illinois": { gdp_b: 37.39, gdp_pct: 3.4, jobs: 226407, jobs_pct: 3.7 },
+    "Indiana": { gdp_b: 10.09, gdp_pct: 2.0, jobs: 92643, jobs_pct: 2.9 },
+    "Iowa": { gdp_b: 5.2, gdp_pct: 2.0, jobs: 48290, jobs_pct: 3.1 },
+    "Kansas": { gdp_b: 5.48, gdp_pct: 2.4, jobs: 49454, jobs_pct: 3.5 },
+    "Kentucky": { gdp_b: 6.92, gdp_pct: 2.5, jobs: 51094, jobs_pct: 2.6 },
+    "Louisiana": { gdp_b: 6.56, gdp_pct: 2.1, jobs: 48591, jobs_pct: 2.4 },
+    "Maine": { gdp_b: 2.5, gdp_pct: 2.7, jobs: 18073, jobs_pct: 2.8 },
+    "Maryland": { gdp_b: 13.67, gdp_pct: 2.7, jobs: 86234, jobs_pct: 2.9 },
+    "Massachusetts": { gdp_b: 29.74, gdp_pct: 4.0, jobs: 130263, jobs_pct: 3.5 },
+    "Michigan": { gdp_b: 20.55, gdp_pct: 3.0, jobs: 144279, jobs_pct: 3.1 },
+    "Minnesota": { gdp_b: 14.8, gdp_pct: 3.1, jobs: 93918, jobs_pct: 3.2 },
+    "Mississippi": { gdp_b: 2.71, gdp_pct: 1.8, jobs: 31781, jobs_pct: 2.7 },
+    "Missouri": { gdp_b: 12.65, gdp_pct: 2.9, jobs: 89121, jobs_pct: 3.1 },
+    "Montana": { gdp_b: 2.45, gdp_pct: 3.3, jobs: 20269, jobs_pct: 3.9 },
+    "Nebraska": { gdp_b: 4.1, gdp_pct: 2.3, jobs: 34454, jobs_pct: 3.4 },
+    "Nevada": { gdp_b: 12.43, gdp_pct: 5.1, jobs: 46761, jobs_pct: 3.2 },
+    "New Hampshire": { gdp_b: 3.51, gdp_pct: 3.1, jobs: 22986, jobs_pct: 3.2 },
+    "New Jersey": { gdp_b: 29.19, gdp_pct: 3.6, jobs: 148377, jobs_pct: 3.5 },
+    "New Mexico": { gdp_b: 3.46, gdp_pct: 2.6, jobs: 28153, jobs_pct: 3.2 },
+    "New York": { gdp_b: 164.71, gdp_pct: 7.6, jobs: 482543, jobs_pct: 5.1 },
+    "North Carolina": { gdp_b: 25.05, gdp_pct: 3.2, jobs: 167254, jobs_pct: 3.5 },
+    "North Dakota": { gdp_b: 1.77, gdp_pct: 2.3, jobs: 14852, jobs_pct: 3.7 },
+    "Ohio": { gdp_b: 26.12, gdp_pct: 3.0, jobs: 150783, jobs_pct: 2.7 },
+    "Oklahoma": { gdp_b: 5.41, gdp_pct: 2.1, jobs: 48659, jobs_pct: 2.8 },
+    "Oregon": { gdp_b: 11.07, gdp_pct: 3.5, jobs: 70137, jobs_pct: 3.5 },
+    "Pennsylvania": { gdp_b: 30.43, gdp_pct: 3.1, jobs: 189700, jobs_pct: 3.1 },
+    "Rhode Island": { gdp_b: 2.57, gdp_pct: 3.3, jobs: 17424, jobs_pct: 3.4 },
+    "South Carolina": { gdp_b: 9.41, gdp_pct: 2.9, jobs: 67784, jobs_pct: 3.0 },
+    "South Dakota": { gdp_b: 1.5, gdp_pct: 2.0, jobs: 16176, jobs_pct: 3.7 },
+    "Tennessee": { gdp_b: 21.18, gdp_pct: 4.0, jobs: 108773, jobs_pct: 3.4 },
+    "Texas": { gdp_b: 65.57, gdp_pct: 2.5, jobs: 360964, jobs_pct: 2.7 },
+    "Utah": { gdp_b: 9.59, gdp_pct: 3.4, jobs: 69047, jobs_pct: 4.4 },
+    "Vermont": { gdp_b: 1.25, gdp_pct: 2.9, jobs: 10412, jobs_pct: 3.2 },
+    "Virginia": { gdp_b: 21.35, gdp_pct: 3.0, jobs: 117878, jobs_pct: 2.9 },
+    "Washington": { gdp_b: 78.99, gdp_pct: 9.8, jobs: 190684, jobs_pct: 5.1 },
+    "West Virginia": { gdp_b: 1.57, gdp_pct: 1.5, jobs: 18145, jobs_pct: 2.5 },
+    "Wisconsin": { gdp_b: 12.44, gdp_pct: 2.9, jobs: 95305, jobs_pct: 3.2 },
+    "Wyoming": { gdp_b: 1.38, gdp_pct: 2.7, jobs: 11336, jobs_pct: 3.9 }
+  }
+};
+
+</script>
+<script>
+// ─── NASAA State Arts Agency Data ────────────────────────────────────────────
+// Source: National Assembly of State Arts Agencies (NASAA)
+// State Arts Agency Revenues Reports — nasaa-arts.org
+//
+// NASAA_DATA        — per capita investment (Legislative Approp incl. line items, $/capita)
+//                     FY2022 derived · FY2023 direct from Table 6 · FY2024 derived · FY2025 direct from Table 6
+// NASAA_TOTALS      — total appropriation & baseline (excl. line items), FY2025, millions USD
+// NASAA_RANKS       — per capita rank of 50 states, FY2025, Legislative Approp incl. line items
+//
+// Update cycle: NASAA publishes twice yearly. Replace values when new report is released.
+// FY2026 report expected: summer 2026
+
+// ─── NASAA Real Data ───────────────────────────────────────────────────────
+// Source: NASAA State Arts Agency Revenues Reports, Table 6
+// Metric: Legislative Appropriation Including Line Items ($/capita)
+// FY2022 derived from Table 1/5 revenue totals · FY2023 & FY2025 direct from Table 6
+// FY2024 derived from Table 5 FY2024 revenue totals
+const NASAA_DATA = {
+  years: [2022, 2023, 2024, 2025],
+  national: [2.47, 2.88, 2.23, 2.02],
+  states: {
+    "Alabama":        [1.32, 1.50, 2.01, 1.58],
+    "Alaska":         [0.96, 1.05, 0.94, 1.24],
+    "Arizona":        [0.62, 0.68, 0.97, 0.26],
+    "Arkansas":       [0.44, 0.45, 0.46, 0.48],
+    "California":     [4.31, 3.48, 1.01, 0.82],
+    "Colorado":       [0.34, 0.35, 0.39, 0.55],
+    "Connecticut":    [9.44, 10.38, 2.27, 1.88],
+    "Delaware":       [3.81, 3.81, 4.78, 5.62],
+    "Florida":        [1.97, 3.76, 2.59, 1.31],
+    "Georgia":        [0.14, 0.14, 0.15, 0.14],
+    "Hawaii":         [5.40, 5.05, 11.14, 11.10],
+    "Idaho":          [0.47, 0.47, 0.54, 0.47],
+    "Illinois":       [5.05, 5.06, 5.17, 2.71],
+    "Indiana":        [0.53, 0.53, 0.77, 0.75],
+    "Iowa":           [0.46, 0.46, 0.68, 0.69],
+    "Kansas":         [0.17, 0.17, 0.35, 0.51],
+    "Kentucky":       [0.39, 0.40, 0.41, 0.40],
+    "Louisiana":      [0.47, 0.47, 0.46, 0.46],
+    "Maine":          [0.73, 0.74, 0.74, 0.74],
+    "Maryland":       [4.34, 4.51, 5.70, 5.47],
+    "Massachusetts":  [3.10, 3.35, 3.74, 3.76],
+    "Michigan":       [0.98, 1.18, 0.87, 1.10],
+    "Minnesota":      [7.37, 7.62, 9.68, 10.07],
+    "Mississippi":    [0.56, 2.01, 3.57, 3.38],
+    "Missouri":       [1.15, 3.01, 4.74, 8.72],
+    "Montana":        [0.51, 0.47, 1.02, 1.00],
+    "Nebraska":       [1.30, 5.13, 1.33, 1.31],
+    "Nevada":         [0.63, 0.66, 0.72, 0.75],
+    "New Hampshire":  [0.60, 0.60, 1.04, 1.01],
+    "New Jersey":     [6.63, 4.40, 4.93, 4.32],
+    "New Mexico":     [0.67, 0.75, 0.82, 0.79],
+    "New York":       [5.42, 12.27, 5.59, 4.39],
+    "North Carolina": [2.22, 0.85, 1.18, 1.12],
+    "North Dakota":   [1.08, 1.10, 1.72, 1.65],
+    "Ohio":           [1.71, 1.71, 2.19, 2.15],
+    "Oklahoma":       [0.75, 0.81, 1.06, 1.06],
+    "Oregon":         [0.96, 2.64, 1.43, 1.89],
+    "Pennsylvania":   [0.81, 0.81, 0.81, 0.82],
+    "Rhode Island":   [1.99, 2.01, 2.17, 2.15],
+    "South Carolina": [8.90, 2.64, 2.49, 2.24],
+    "South Dakota":   [1.23, 1.22, 1.47, 1.52],
+    "Tennessee":      [1.41, 1.56, 2.17, 2.22],
+    "Texas":          [0.34, 0.34, 0.47, 0.46],
+    "Utah":           [2.73, 2.79, 2.14, 3.09],
+    "Vermont":        [1.23, 1.33, 1.52, 1.50],
+    "Virginia":       [0.46, 0.53, 0.54, 0.52],
+    "Washington":     [0.42, 0.68, 0.86, 0.98],
+    "West Virginia":  [0.51, 0.54, 0.44, 0.46],
+    "Wisconsin":      [0.14, 0.14, 0.19, 0.18],
+    "Wyoming":        [1.60, 1.54, 1.68, 1.83]
+  }
+};
+
+// ─── NASAA Totals FY2025 ────────────────────────────────────────────────────
+// Source: NASAA FY2025 Report, Table 1 (total incl. line items) & Table 2 (excl.)
+// Values in millions of dollars
+const NASAA_TOTALS = {
+  states: {
+    "Alabama":        { total_fy2025: 8.16,   baseline_fy2025: 6.83  },
+    "Alaska":         { total_fy2025: 0.92,   baseline_fy2025: 0.92  },
+    "Arizona":        { total_fy2025: 2.00,   baseline_fy2025: 2.00  },
+    "Arkansas":       { total_fy2025: 1.47,   baseline_fy2025: 1.47  },
+    "California":     { total_fy2025: 32.39,  baseline_fy2025: 32.39 },
+    "Colorado":       { total_fy2025: 3.27,   baseline_fy2025: 3.27  },
+    "Connecticut":    { total_fy2025: 6.91,   baseline_fy2025: 1.50  },
+    "Delaware":       { total_fy2025: 5.91,   baseline_fy2025: 5.91  },
+    "Florida":        { total_fy2025: 30.67,  baseline_fy2025: 0.74  },
+    "Georgia":        { total_fy2025: 1.59,   baseline_fy2025: 1.59  },
+    "Hawaii":         { total_fy2025: 16.05,  baseline_fy2025: 6.55  },
+    "Idaho":          { total_fy2025: 0.93,   baseline_fy2025: 0.93  },
+    "Illinois":       { total_fy2025: 34.40,  baseline_fy2025: 19.73 },
+    "Indiana":        { total_fy2025: 5.20,   baseline_fy2025: 5.20  },
+    "Iowa":           { total_fy2025: 2.22,   baseline_fy2025: 1.15  },
+    "Kansas":         { total_fy2025: 1.52,   baseline_fy2025: 1.52  },
+    "Kentucky":       { total_fy2025: 1.83,   baseline_fy2025: 1.83  },
+    "Louisiana":      { total_fy2025: 2.11,   baseline_fy2025: 2.11  },
+    "Maine":          { total_fy2025: 1.04,   baseline_fy2025: 1.04  },
+    "Maryland":       { total_fy2025: 34.25,  baseline_fy2025: 33.33 },
+    "Massachusetts":  { total_fy2025: 26.85,  baseline_fy2025: 25.90 },
+    "Michigan":       { total_fy2025: 11.13,  baseline_fy2025: 9.51  },
+    "Minnesota":      { total_fy2025: 58.32,  baseline_fy2025: 58.32 },
+    "Mississippi":    { total_fy2025: 9.94,   baseline_fy2025: 9.94  },
+    "Missouri":       { total_fy2025: 54.44,  baseline_fy2025: 10.95 },
+    "Montana":        { total_fy2025: 1.13,   baseline_fy2025: 1.13  },
+    "Nebraska":       { total_fy2025: 2.63,   baseline_fy2025: 2.63  },
+    "Nevada":         { total_fy2025: 2.44,   baseline_fy2025: 2.44  },
+    "New Hampshire":  { total_fy2025: 1.42,   baseline_fy2025: 1.42  },
+    "New Jersey":     { total_fy2025: 41.06,  baseline_fy2025: 32.36 },
+    "New Mexico":     { total_fy2025: 1.69,   baseline_fy2025: 1.69  },
+    "New York":       { total_fy2025: 87.28,  baseline_fy2025: 82.78 },
+    "North Carolina": { total_fy2025: 12.41,  baseline_fy2025: 12.29 },
+    "North Dakota":   { total_fy2025: 1.31,   baseline_fy2025: 1.31  },
+    "Ohio":           { total_fy2025: 25.56,  baseline_fy2025: 25.56 },
+    "Oklahoma":       { total_fy2025: 4.35,   baseline_fy2025: 3.95  },
+    "Oregon":         { total_fy2025: 8.06,   baseline_fy2025: 2.18  },
+    "Pennsylvania":   { total_fy2025: 10.66,  baseline_fy2025: 10.66 },
+    "Rhode Island":   { total_fy2025: 2.40,   baseline_fy2025: 2.00  },
+    "South Carolina": { total_fy2025: 12.25,  baseline_fy2025: 12.05 },
+    "South Dakota":   { total_fy2025: 1.41,   baseline_fy2025: 1.41  },
+    "Tennessee":      { total_fy2025: 16.02,  baseline_fy2025: 15.72 },
+    "Texas":          { total_fy2025: 14.32,  baseline_fy2025: 14.32 },
+    "Utah":           { total_fy2025: 10.84,  baseline_fy2025: 10.84 },
+    "Vermont":        { total_fy2025: 0.97,   baseline_fy2025: 0.97  },
+    "Virginia":       { total_fy2025: 4.59,   baseline_fy2025: 4.59  },
+    "Washington":     { total_fy2025: 7.80,   baseline_fy2025: 7.80  },
+    "West Virginia":  { total_fy2025: 0.81,   baseline_fy2025: 0.81  },
+    "Wisconsin":      { total_fy2025: 1.08,   baseline_fy2025: 1.08  },
+    "Wyoming":        { total_fy2025: 1.08,   baseline_fy2025: 1.08  }
+  }
+};
+
+// ─── NASAA Rankings FY2025 ──────────────────────────────────────────────────
+// Source: NASAA FY2025 Report, Table 6 · Legislative Approp Incl. Line Items · rank of 50
+const NASAA_RANKS = {
+  states: {
+    "Alabama": 20, "Alaska": 25, "Arizona": 48, "Arkansas": 42,
+    "California": 32, "Colorado": 39, "Connecticut": 17, "Delaware": 4,
+    "Florida": 23, "Georgia": 50, "Hawaii": 1, "Idaho": 43,
+    "Illinois": 11, "Indiana": 35, "Iowa": 38, "Kansas": 41,
+    "Kentucky": 47, "Louisiana": 44, "Maine": 37, "Maryland": 5,
+    "Massachusetts": 8, "Michigan": 27, "Minnesota": 2, "Mississippi": 9,
+    "Missouri": 3, "Montana": 30, "Nebraska": 24, "Nevada": 36,
+    "New Hampshire": 29, "New Jersey": 7, "New Mexico": 34, "New York": 6,
+    "North Carolina": 26, "North Dakota": 19, "Ohio": 15, "Oklahoma": 28,
+    "Oregon": 16, "Pennsylvania": 33, "Rhode Island": 14, "South Carolina": 12,
+    "South Dakota": 21, "Tennessee": 13, "Texas": 46, "Utah": 10,
+    "Vermont": 22, "Virginia": 40, "Washington": 31, "West Virginia": 45,
+    "Wisconsin": 49, "Wyoming": 18
+  }
+};
+</script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
