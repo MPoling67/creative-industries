@@ -658,7 +658,7 @@ select.state-pick.optional:not([value=""]):not([data-empty="true"]){
 <div class="selector-zone">
   <div class="selector-head">
     <h3>Score Your <em>State</em></h3>
-    <p>Select up to six states to compare them to the national average.</p>
+    <p style="color:#f0ede8;">Select up to six states</p>
   </div>
 
   <div class="selectors" id="selectors">
@@ -1091,16 +1091,18 @@ function renderCompare(d, zone) {
     const bea = BEA_DATA.states[n] || {};
     const nas = NASAA_DATA.states[n] || [];
     const tot = (NASAA_TOTALS.states[n] || {});
-    const gdp_b      = bea.gdp_b    || 0;
-    const inv_percap = nas.slice(-1)[0] || 0;
-    const jobs       = bea.jobs     || 0;
-    const jobs_pct   = bea.jobs_pct || 0;
-    const inv_total  = tot.total_fy2025 || 0;
-    return { name: n, gdp_b, inv_percap, jobs, jobs_pct, inv_total, color: colorMap[n] };
+    const gdp_b        = bea.gdp_b    || 0;
+    const gdp_pct      = bea.gdp_pct  || 0;
+    const inv_percap   = nas.slice(-1)[0] || 0;
+    const inv_percap_fy2022 = nas[0] || 0;
+    const jobs         = bea.jobs     || 0;
+    const jobs_pct     = bea.jobs_pct || 0;
+    const inv_total    = tot.total_fy2025 || 0;
+    return { name: n, gdp_b, gdp_pct, inv_percap, inv_percap_fy2022, jobs, jobs_pct, inv_total, color: colorMap[n] };
   });
 
   const maxGdp  = Math.max(...stateData.map(s => s.gdp_b));
-  const maxInv  = Math.max(...stateData.map(s => s.inv_percap));
+  const maxInv  = Math.max(...stateData.map(s => s.inv_total));
   const maxJobs = Math.max(...stateData.map(s => s.jobs));
 
   // Column grid: name | bar | value + pct
@@ -1118,8 +1120,8 @@ function renderCompare(d, zone) {
     }).join('');
   }
 
-  const gdpRows  = metricRows('gdp_b', maxGdp, v => `$${v}B`);
-  const invRows  = metricRows('inv_percap', maxInv, (v, s) => `$${v.toFixed(2)}/cap &nbsp;<span style="color:var(--muted);font-size:11px;">$${s.inv_total.toFixed(1)}M total</span>`);
+  const gdpRows  = metricRows('gdp_b', maxGdp, (v, s) => `$${v}B &nbsp;<span style="color:var(--muted);font-size:11px;">${s.gdp_pct}% of GDP</span>`);
+  const invRows  = metricRows('inv_total', maxInv, (v, s) => `$${v.toFixed(1)}M &nbsp;<span style="color:var(--muted);font-size:11px;">$${s.inv_percap.toFixed(2)}/cap</span>`);
   const jobsRows = stateData.map(s => {
     const raw = s.jobs || 0;
     const pct = maxJobs ? Math.round((raw / maxJobs) * 100) : 0;
@@ -1130,23 +1132,39 @@ function renderCompare(d, zone) {
     </div>`;
   }).join('');
 
-  // Summary cards — responsive grid, colored top border
+  // Summary cards — computed stats, no AI needed
+  const NAT_JOBS_PCT = 3.4;
   const cols = d.states.length <= 2 ? d.states.length : Math.min(d.states.length, 3);
-  const summaryCards = d.states.map(s => {
-    const sc = s.score_color || '#be3650';
-    const stateColor = colorMap[s.state];
+  const summaryCards = stateData.map(s => {
+    // Trend arrow + label
+    const diff = s.inv_percap - s.inv_percap_fy2022;
+    const pctChange = s.inv_percap_fy2022 ? (diff / s.inv_percap_fy2022) * 100 : 0;
+    const arrow = pctChange > 10 ? '↑' : pctChange < -10 ? '↓' : '→';
+    const trendColor = pctChange > 10 ? '#4caf8a' : pctChange < -10 ? '#be3650' : '#8a8a84';
+    const fundingLine = `$${s.inv_percap_fy2022.toFixed(2)}/cap (FY2022) → $${s.inv_percap.toFixed(2)}/cap (FY2025) · $${s.inv_total.toFixed(1)}M total`;
+
+    // Jobs vs national avg
+    const jobsDiff = s.jobs_pct - NAT_JOBS_PCT;
+    const jobsLabel = jobsDiff > 0.2
+      ? `${s.jobs_pct}% of workforce — <span style="color:#4caf8a;">beats national avg (${NAT_JOBS_PCT}%) ✓</span>`
+      : jobsDiff < -0.2
+      ? `${s.jobs_pct}% of workforce — <span style="color:#be3650;">below national avg (${NAT_JOBS_PCT}%)</span>`
+      : `${s.jobs_pct}% of workforce — <span style="color:#8a8a84;">at national avg (${NAT_JOBS_PCT}%)</span>`;
+
     return `
-      <div class="summary-card" style="border-top-color:${stateColor}">
-        <div class="sc-name">${s.state}</div>
-        <div class="sc-narrative">${s.narrative}</div>
+      <div class="summary-card" style="border-top-color:${s.color}">
+        <div class="sc-name">${s.name}</div>
+        <div style="font-size:12px;line-height:1.7;margin-top:6px;">
+          <div><span style="color:${trendColor};font-weight:500;">${arrow}</span> <span style="color:#f0ede8;">${fundingLine}</span></div>
+          <div style="margin-top:4px;color:#f0ede8;">Creative jobs: ${jobsLabel}</div>
+        </div>
       </div>`;
   }).join('');
 
   zone.innerHTML = `
     <div class="result-compare" style="padding:0 0 2rem">
       <div class="compare-header">
-        <h3>Comparing <em>${d.states.length} states</em></h3>
-        <p>Scored against national benchmarks · BEA ACPSA 2023 · NASAA FY2025</p>
+        <h3>Comparing <em>${d.states.length} States</em></h3>
       </div>
 
       <div class="metric-cards">
@@ -1155,7 +1173,7 @@ function renderCompare(d, zone) {
           <div class="metric-row">${gdpRows}</div>
         </div>
         <div class="metric-card">
-          <div class="metric-card-label">Per Capita Arts Investment (NASAA FY2025)</div>
+          <div class="metric-card-label">Total Arts Investment (NASAA FY2025)</div>
           <div class="metric-row">${invRows}</div>
         </div>
         <div class="metric-card">
